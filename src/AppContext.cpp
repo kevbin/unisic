@@ -1,6 +1,7 @@
 #include "AppContext.h"
 #include "unisic_build_date.h" // generated into the build dir (cmake/BuildDate.cmake)
 #include "Settings.h"
+#include "UiLanguage.h"
 #include "capture/CaptureManager.h"
 #include "capture/KWinScreenShot2.h"
 #include "capture/ScrollCaptureController.h"
@@ -794,17 +795,7 @@ void AppContext::applyLanguage()
     const QString pref = m_settings->uiLanguage();
     // Every language (incl. English) has its own .qm, so English text is
     // editable in i18n/unisic_en.ts without touching source strings.
-    static const QStringList supported = {QStringLiteral("en"), QStringLiteral("pl"),
-                                          QStringLiteral("es"), QStringLiteral("it"),
-                                          QStringLiteral("fr"), QStringLiteral("ru"),
-                                          QStringLiteral("de")};
-    QString code;
-    if (supported.contains(pref)) {
-        code = pref;
-    } else { // "system"
-        const QString sys = QLocale::system().name().left(2); // e.g. "pl_PL" → "pl"
-        code = supported.contains(sys) ? sys : QStringLiteral("en");
-    }
+    const QString code = UiLanguage::resolve(pref);
     m_uiLanguage = code;
     if (m_engine)
         m_engine->setUiLanguage(code);
@@ -2633,15 +2624,7 @@ bool AppContext::showNotificationHelper(CaptureNotification *n, const QVariantMa
     // Resolve the UI language exactly as applyLanguage() does, so the card's
     // qsTr strings render in the same language as the rest of the app.
     const QString pref = m_settings->uiLanguage();
-    static const QStringList supported = {QStringLiteral("en"), QStringLiteral("pl"),
-                                          QStringLiteral("es"), QStringLiteral("it"),
-                                          QStringLiteral("fr"), QStringLiteral("ru"),
-                                          QStringLiteral("de")};
-    QString lang = pref;
-    if (!supported.contains(pref)) {
-        const QString sys = QLocale::system().name().left(2);
-        lang = supported.contains(sys) ? sys : QStringLiteral("en");
-    }
+    const QString lang = UiLanguage::resolve(pref);
 
     auto *proc = new QProcess(this);
     proc->setProgram(QCoreApplication::applicationFilePath());
