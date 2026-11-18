@@ -23,7 +23,8 @@
 
 #include <memory>
 
-static const char *kFeedUrl = "https://api.github.com/repos/unisic/unisic/releases/latest";
+// Personal builds consume only releases that preserve the Chinese and GNOME fixes.
+static const char *kFeedUrl = "https://api.github.com/repos/kevbin/unisic/releases/latest";
 
 // The sha256 GitHub computed for a release asset when it was uploaded, as bare
 // lowercase hex ("" for an asset uploaded before the API published digests).
@@ -65,7 +66,7 @@ QUrl UpdateChecker::feedUrl() const
     // only). handleCheckReply unwraps either an array or an object.
     if (m_settings
         && m_settings->updateChannel().compare(QLatin1String("beta"), Qt::CaseInsensitive) == 0)
-        return QUrl(QStringLiteral("https://api.github.com/repos/unisic/unisic/releases?per_page=1"));
+        return QUrl(QStringLiteral("https://api.github.com/repos/kevbin/unisic/releases?per_page=1"));
     return QUrl(QLatin1String(kFeedUrl));
 }
 

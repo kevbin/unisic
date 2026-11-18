@@ -44,7 +44,7 @@ runs:
     # for a local hotfix without rebuilding the unchanged AppImage runtime.
     # Regular PR/package runs retain their original build and packaging flow.
     - name: Build hotfix executable for manual Tests runs
-      if: github.event_name == 'workflow_dispatch' && github.workflow == 'Tests'
+      if: (github.event_name == 'workflow_dispatch' && github.workflow == 'Tests') || (github.workflow == 'Fork updates' && inputs.build-dir == 'build')
       shell: bash
       env:
         UNISIC_FIX_BUILD_DIR: ${{ inputs.build-dir }}
@@ -54,7 +54,7 @@ runs:
         cmake --build "$UNISIC_FIX_BUILD_DIR" --target unisic --parallel
 
     - name: Upload hotfix executable
-      if: github.event_name == 'workflow_dispatch' && github.workflow == 'Tests'
+      if: (github.event_name == 'workflow_dispatch' && github.workflow == 'Tests') || (github.workflow == 'Fork updates' && inputs.build-dir == 'build')
       uses: actions/upload-artifact@v4
       with:
         name: unisic-gnomefix-executable

@@ -20,6 +20,7 @@ env:
 
 jobs:
   check:
+    if: github.repository == 'unisic/unisic'
     name: Version check
     runs-on: ubuntu-latest
     outputs:

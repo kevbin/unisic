@@ -1,0 +1,88 @@
+name: Fork updates
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: Rebuild the current maintained source even if already released
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-fork-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'kevbin/unisic'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      should_release: ${{ steps.prepare.outputs.should_release }}
+      source_sha: ${{ steps.prepare.outputs.source_sha }}
+      version: ${{ steps.prepare.outputs.version }}
+      upstream_tag: ${{ steps.prepare.outputs.upstream_tag }}
+      upstream_sha: ${{ steps.prepare.outputs.upstream_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Configure merge identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Merge the stable upstream release and select a fork version
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_RELEASE: ${{ inputs.force_release || false }}
+        run: |
+          args=()
+          if [ "$FORCE_RELEASE" = true ]; then args+=(--force); fi
+          python3 scripts/fork_release.py "${args[@]}"
+
+  tests:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    uses: ./.github/workflows/tests.yml
+    with:
+      ref: ${{ needs.prepare.outputs.source_sha }}
+      fork_version: ${{ needs.prepare.outputs.version }}
+
+  bundle:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
+    uses: ./.github/workflows/appimage.yml
+    with:
+      ref: ${{ needs.prepare.outputs.source_sha }}
+      fork_version: ${{ needs.prepare.outputs.version }}
+
+  publish:
+    needs: [prepare, tests, bundle]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: unisic-appimage
+          path: dist
+      - name: Verify and publish the tested personal release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORK_VERSION: ${{ needs.prepare.outputs.version }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
+          UPSTREAM_TAG: ${{ needs.prepare.outputs.upstream_tag }}
+          UPSTREAM_SHA: ${{ needs.prepare.outputs.upstream_sha }}
+        run: python3 scripts/publish_fork_release.py

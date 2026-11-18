@@ -5737,7 +5737,10 @@ void AppContext::runSmokeTest()
         const bool cmpOk = UpdateVersion::isNewer(QStringLiteral("0.5.2"), QStringLiteral("0.5.1"))
                         && !UpdateVersion::isNewer(QStringLiteral("v0.5.1"), QStringLiteral("0.5.1"))
                         && UpdateVersion::isNewer(QStringLiteral("0.5.1"), QStringLiteral("0.5.1b"))
-                        && !UpdateVersion::isNewer(QStringLiteral("0.5.0"), QStringLiteral("0.5.1"));
+                        && !UpdateVersion::isNewer(QStringLiteral("0.5.0"), QStringLiteral("0.5.1"))
+                        && UpdateVersion::isNewer(QStringLiteral("0.8.9.12"), QStringLiteral("0.8.9.9"))
+                        && UpdateVersion::isNewer(QStringLiteral("0.8.10.1"), QStringLiteral("0.8.9.12"))
+                        && !UpdateVersion::isNewer(QStringLiteral("0.8.9.9"), QStringLiteral("0.8.9.12"));
         smokeLog(QStringLiteral("version compare: ")
                  + (cmpOk ? QStringLiteral("PASS") : QStringLiteral("FAIL")));
         const QString gate = autoRestartBlockers();

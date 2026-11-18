@@ -16,6 +16,14 @@ on:
   pull_request:
     branches: [dev, main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      fork_version:
+        type: string
+        default: ""
 
 # A newer push to the same branch cancels the still-running check of the
 # previous commit - only the newest commit's result matters.
@@ -30,6 +38,8 @@ defaults:
 env:
   # Pinned so the source-built prefix cache key is stable and a bumped tag
   # invalidates it by itself.
+  UNISIC_FORK_VERSION: ${{ inputs.fork_version || '' }}
+  UNISIC_BUILD_NUMBER: ${{ inputs.fork_version != '' && github.run_number || '' }}
   QT_VERSION: "6.8.3"
   ECM_TAG: v6.10.0
   LAYERSHELL_TAG: v6.3.5
@@ -48,7 +58,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref || github.sha }}
           submodules: recursive
+
+      - name: Check personal release automation
+        run: |
+          python3 -m unittest discover -s tests -p test_fork_release.py -v
+          python3 scripts/fork_release.py --check-catalog
 
       - name: Install host dependencies
         run: |
@@ -177,6 +193,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Fail on unfinished or empty translations
         run: |
@@ -189,5 +207,5 @@ jobs:
               status=1
             fi
           done
-          [ "$status" = "0" ] && echo "all seven .ts files are complete"
+          [ "$status" = "0" ] && echo "all translation catalogs are complete"
           exit "$status"

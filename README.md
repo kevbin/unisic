@@ -1,3 +1,5 @@
+> **个人维护版**：保留简体中文和 GNOME 滚动截图修复。每 6 小时检查上游正式发行版，合并并通过测试后发布到 [kevbin/unisic Releases](https://github.com/kevbin/unisic/releases)。软件从此仓库检查更新。[维护说明](docs/dev/fork-updates.md)
+
 <div align="center">
 
 <img src="resources/icons/unisic.svg" width="160" height="160" alt="Unisic" />

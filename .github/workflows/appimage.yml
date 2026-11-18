@@ -18,12 +18,17 @@ on:
         type: string
         required: false
         default: ""
+      fork_version:
+        type: string
+        required: false
+        default: ""
 
 defaults:
   run:
     shell: bash
 
 env:
+  UNISIC_FORK_VERSION: ${{ inputs.fork_version || '' }}
   BUILD_TYPE: Release
   UNISIC_BUILD_NUMBER: ${{ github.run_number }}
 
@@ -92,9 +97,17 @@ jobs:
           # "waylandcompositor" deployer links against (its name is misleading -
           # it actually deploys the client-side plugin dirs).
           modules: qtmultimedia qtwaylandcompositor
-          cache: false
+          cache: true
+
+      - name: Restore the source-built KDE prefix
+        id: optprefix
+        uses: actions/cache@v4
+        with:
+          path: lsq-prefix
+          key: optprefix-noble-${{ runner.os }}-qt6.8.3-ecmv6.10.0-lsqv6.3.5-kgav6.10.0-pwpv1.16.0
 
       - name: Build extra-cmake-modules
+        if: steps.optprefix.outputs.cache-hit != 'true'
         # The KDE build system the three source builds below need. Noble ships
         # ECM 5.115 and all three want 6.10, so it goes into the same local
         # prefix they install into. Script only, seconds to build.
@@ -111,6 +124,7 @@ jobs:
           cmake --install build-ecm
 
       - name: Build plasma-wayland-protocols
+        if: steps.optprefix.outputs.cache-hit != 'true'
         # Its OWN step, because two different gates depend on it and they used
         # to share a step with layer-shell-qt: one failure there took out
         # HAVE_KWIN_SCREENCAST and HAVE_KGUIADDONS as collateral, which is
@@ -135,6 +149,7 @@ jobs:
           cmake --install build-pwp
 
       - name: Build LayerShellQt (against the aqt Qt)
+        if: steps.optprefix.outputs.cache-hit != 'true'
         # HAVE_LAYERSHELL: the styled capture card, the overlay above
         # fullscreen windows and the pinned preview. Noble's
         # liblayershellqtinterface-dev is the Qt5 build (5.27), which cannot
@@ -151,6 +166,7 @@ jobs:
           cmake --install build-lsq
 
       - name: Build KF6GuiAddons (against the aqt Qt)
+        if: steps.optprefix.outputs.cache-hit != 'true'
         # HAVE_KGUIADDONS: KSystemClipboard puts screenshots into KDE Plasma's
         # Klipper clipboard HISTORY - plain image/png (QClipboard/wl-copy) is
         # pasteable but never recorded (issue #51). Noble has no KF6 at all, so
@@ -236,14 +252,16 @@ jobs:
           # Embedded update information (AppImageUpdate / libappimageupdate):
           # differential updates via the .zsync file published with each
           # release. "latest" tracks the newest non-prerelease GitHub release.
-          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|unisic|unisic|latest|Unisic-*x86_64.AppImage.zsync"
+          LDAI_UPDATE_INFORMATION: "gh-releases-zsync|kevbin|unisic|latest|Unisic-*x86_64.AppImage.zsync"
           # Older linuxdeploy-plugin-appimage builds read the unprefixed name.
-          UPDATE_INFORMATION: "gh-releases-zsync|unisic|unisic|latest|Unisic-*x86_64.AppImage.zsync"
+          UPDATE_INFORMATION: "gh-releases-zsync|kevbin|unisic|latest|Unisic-*x86_64.AppImage.zsync"
         run: |
           # Display version (allows pre-release suffixes like "0.3b"); falls
           # back to the numeric project() version if the string is absent.
           version_line="$(grep -m1 '^set(UNISIC_VERSION_STRING' CMakeLists.txt || true)"
-          if [[ -n "$version_line" ]]; then
+          if [[ -n "${UNISIC_FORK_VERSION:-}" ]]; then
+            version="$UNISIC_FORK_VERSION"
+          elif [[ -n "$version_line" ]]; then
             version="$(sed -E 's/.*"([^"]+)".*/\1/' <<<"$version_line")"
           else
             version_line="$(grep -m1 '^project(unisic VERSION' CMakeLists.txt)"

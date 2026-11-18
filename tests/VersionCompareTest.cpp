@@ -25,6 +25,12 @@ private slots:
         QTest::newRow("remote prerelease of local final") << "0.5.1b" << "0.5.1"  << false;
         QTest::newRow("same prerelease")       << "0.5.1b"  << "0.5.1b" << false;
         QTest::newRow("newer despite suffix")  << "0.5.2b"  << "0.5.1"  << true;
+        QTest::newRow("first fork release") << "v0.8.9.1" << "0.8.9" << true;
+        QTest::newRow("fork revision bump") << "v0.8.9.12" << "0.8.9.9" << true;
+        QTest::newRow("equal fork revision") << "v0.8.9.12" << "0.8.9.12" << false;
+        QTest::newRow("older fork revision") << "v0.8.9.9" << "0.8.9.12" << false;
+        QTest::newRow("next upstream on fork") << "v0.8.10.1" << "0.8.9.12" << true;
+        QTest::newRow("older upstream on fork") << "v0.8.9.100" << "0.8.10.1" << false;
         QTest::newRow("garbage remote")        << "latest"  << "0.5.1"  << false;
         QTest::newRow("empty remote")          << ""        << "0.5.1"  << false;
     }

@@ -220,6 +220,20 @@ qt_add_executable(unisic
 # AppImage's own, so nothing else changes.
 set_target_properties(unisic PROPERTIES INSTALL_RPATH "")
 
+# Personal releases use a fourth numeric component so repeated builds of the
+# same upstream version remain ordered by the existing update comparator.
+# Keep the upstream version line untouched so future release merges are clean.
+if(DEFINED ENV{UNISIC_FORK_VERSION} AND NOT "$ENV{UNISIC_FORK_VERSION}" STREQUAL "")
+    if(NOT "$ENV{UNISIC_FORK_VERSION}" MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$")
+        message(FATAL_ERROR "UNISIC_FORK_VERSION must have four numeric components")
+    endif()
+    string(REGEX REPLACE "\\.[0-9]+$" "" _unisic_fork_base "$ENV{UNISIC_FORK_VERSION}")
+    if(NOT _unisic_fork_base STREQUAL UNISIC_VERSION_STRING)
+        message(FATAL_ERROR "The personal release must use the current upstream version")
+    endif()
+    set(UNISIC_VERSION_STRING "$ENV{UNISIC_FORK_VERSION}")
+endif()
+
 # Single source of the app version string, exported to C++ from the project() call.
 # UNISIC_BUILD carries the CI build number (GITHUB_RUN_NUMBER, set in the release
 # workflow) when built in CI, or "dev" for local builds. Shown in the sidebar footer.
