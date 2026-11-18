@@ -78,6 +78,10 @@ jobs:
         with:
           name: unisic-appimage
           path: dist
+      - name: Provide the desktop libraries the AppImage deliberately leaves to the host
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            libpipewire-0.3-0 libwayland-client0 libwayland-cursor0 libwayland-egl1
       - name: Verify and publish the tested personal release
         env:
           GH_TOKEN: ${{ github.token }}
