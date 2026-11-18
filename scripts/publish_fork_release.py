@@ -9,8 +9,11 @@ import subprocess
 
 
 def run(*args, **kwargs):
-    return subprocess.run(args, check=True, text=True, stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE, **kwargs).stdout.strip()
+    result = subprocess.run(args, text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, **kwargs)
+    if result.returncode:
+        raise RuntimeError(f'{args[0]} exited {result.returncode}: {result.stderr.strip()}')
+    return result.stdout.strip()
 
 
 def publish():

@@ -1,0 +1,27 @@
+name: Inspect AppImage
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Workflow run containing the unisic-appimage artifact
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: unisic-appimage
+          path: dist
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Run the self-contained bundle and report loader errors
+        run: |
+          for image in dist/*.AppImage; do
+            chmod +x "$image"
+            "$image" --appimage-extract-and-run --version
+          done
