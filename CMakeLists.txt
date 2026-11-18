@@ -651,13 +651,17 @@ if(BUILD_TESTING)
     target_link_libraries(unisic_scroll_overlay_geometry_test PRIVATE Qt6::Core Qt6::Test)
     target_include_directories(unisic_scroll_overlay_geometry_test PRIVATE src/capture)
     add_test(NAME unisic_scroll_overlay_geometry_test COMMAND unisic_scroll_overlay_geometry_test)
-    qt_add_executable(unisic_scroll_overlay_probe tests/ScrollOverlayProbe.cpp src/capture/ScrollOverlayHelper.cpp)
-    target_link_libraries(unisic_scroll_overlay_probe PRIVATE Qt6::Widgets)
-    target_include_directories(unisic_scroll_overlay_probe PRIVATE src/capture)
-    qt_add_executable(unisic_scroll_overlay_process_test tests/ScrollOverlayProcessTest.cpp)
-    target_link_libraries(unisic_scroll_overlay_process_test PRIVATE Qt6::Core Qt6::Test)
-    add_dependencies(unisic_scroll_overlay_process_test unisic_scroll_overlay_probe)
-    add_test(NAME unisic_scroll_overlay_process_test COMMAND unisic_scroll_overlay_process_test)
+    # The UI child is Unix-only: QSocketNotifier watches its POSIX stdin pipe.
+    # Windows has its native overlay and cannot watch a CRT pipe as a Winsock socket.
+    if(NOT WIN32)
+        qt_add_executable(unisic_scroll_overlay_probe tests/ScrollOverlayProbe.cpp src/capture/ScrollOverlayHelper.cpp)
+        target_link_libraries(unisic_scroll_overlay_probe PRIVATE Qt6::Widgets)
+        target_include_directories(unisic_scroll_overlay_probe PRIVATE src/capture)
+        qt_add_executable(unisic_scroll_overlay_process_test tests/ScrollOverlayProcessTest.cpp)
+        target_link_libraries(unisic_scroll_overlay_process_test PRIVATE Qt6::Core Qt6::Test)
+        add_dependencies(unisic_scroll_overlay_process_test unisic_scroll_overlay_probe)
+        add_test(NAME unisic_scroll_overlay_process_test COMMAND unisic_scroll_overlay_process_test)
+    endif()
     qt_add_executable(unisic_shortcut_format_test
         tests/ShortcutFormatTest.cpp
         src/hotkeys/ShortcutFormat.h
