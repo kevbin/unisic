@@ -14,6 +14,7 @@ class IScreenGrabber;
 class ScreenCastSession;
 class KWinScreencasting;
 class KWinScreencastStream;
+class QProcess;
 
 class ScrollCaptureController : public QObject
 {
@@ -87,6 +88,8 @@ private:
     void wireGrabber(IScreenGrabber *grabber);
     void createOverlayWindow();
     void closeOverlayWindow();
+    void openOverlayHelper();
+    void syncOverlayHelper();
     void setStatus(bool lostTrack, bool full);
     void setControlsShown(bool shown);
     void finishTick(const QImage &screen, const QRect &sel, int cut);
@@ -127,4 +130,8 @@ private:
     KWinScreencastStream *m_kwinStream = nullptr;
 
     QPointer<QQuickWindow> m_window;
+    QProcess *m_overlayHelper = nullptr;
+    QTimer m_overlaySyncTimer;
+    QByteArray m_helperOutput;
+    int m_helperPreviewRevision = -1;
 };

@@ -161,6 +161,7 @@ qt_add_executable(unisic
     src/capture/CaptureManager.h src/capture/CaptureManager.cpp
     src/capture/ScrollStitcher.h src/capture/ScrollStitcher.cpp
     src/capture/ScrollCaptureController.h src/capture/ScrollCaptureController.cpp
+    src/capture/ScrollOverlayHelper.h src/capture/ScrollOverlayHelper.cpp
     src/capture/ScrollPreviewProvider.h src/capture/ScrollPreviewProvider.cpp
     src/record/GifRecorder.h src/record/GifRecorder.cpp
     src/record/PwDump.h src/record/PwDump.cpp
@@ -646,6 +647,17 @@ include(CPack)
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
+    qt_add_executable(unisic_scroll_overlay_geometry_test tests/ScrollOverlayGeometryTest.cpp)
+    target_link_libraries(unisic_scroll_overlay_geometry_test PRIVATE Qt6::Core Qt6::Test)
+    target_include_directories(unisic_scroll_overlay_geometry_test PRIVATE src/capture)
+    add_test(NAME unisic_scroll_overlay_geometry_test COMMAND unisic_scroll_overlay_geometry_test)
+    qt_add_executable(unisic_scroll_overlay_probe tests/ScrollOverlayProbe.cpp src/capture/ScrollOverlayHelper.cpp)
+    target_link_libraries(unisic_scroll_overlay_probe PRIVATE Qt6::Widgets)
+    target_include_directories(unisic_scroll_overlay_probe PRIVATE src/capture)
+    qt_add_executable(unisic_scroll_overlay_process_test tests/ScrollOverlayProcessTest.cpp)
+    target_link_libraries(unisic_scroll_overlay_process_test PRIVATE Qt6::Core Qt6::Test)
+    add_dependencies(unisic_scroll_overlay_process_test unisic_scroll_overlay_probe)
+    add_test(NAME unisic_scroll_overlay_process_test COMMAND unisic_scroll_overlay_process_test)
     qt_add_executable(unisic_shortcut_format_test
         tests/ShortcutFormatTest.cpp
         src/hotkeys/ShortcutFormat.h

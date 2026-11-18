@@ -5,6 +5,7 @@
 #include "record/X11ShmGrabber.h"
 #include "capture/ScreenCastSession.h"
 #include "capture/KWinScreencasting.h"
+#include "diag/DiagLog.h"
 
 #include <cmath>
 #include <QQmlEngine>
@@ -15,6 +16,12 @@
 #include <QScreen>
 #include <QRegion>
 #include <QMargins>
+#include <QBuffer>
+#include <QColor>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QProcess>
 #include <QtConcurrent/QtConcurrent>
 #include <LayerShellQt/window.h>
 
@@ -24,6 +31,8 @@ ScrollCaptureController::ScrollCaptureController(AppContext *app, QQmlEngine *en
     , m_engine(engine)
 {
     connect(&m_sampleTimer, &QTimer::timeout, this, &ScrollCaptureController::sampleTick);
+    m_overlaySyncTimer.setInterval(100);
+    connect(&m_overlaySyncTimer, &QTimer::timeout, this, &ScrollCaptureController::syncOverlayHelper);
 }
 
 ScrollCaptureController::~ScrollCaptureController()
@@ -131,10 +140,12 @@ void ScrollCaptureController::finish()
 
     // The rows under the badge show only once it is gone: hide it, and the
     // sample ticks finish on a frame without it (finishTick).
-    if (m_coveredRows > 0 && m_window && m_grabber && !m_stitcher.isEmpty()) {
+    if (m_coveredRows > 0 && (m_window || m_overlayHelper) && m_grabber && !m_stitcher.isEmpty()) {
         m_finishing = true;
         m_waitTicks = 0;
-        m_window->hide();
+        if (m_window)
+            m_window->hide();
+        syncOverlayHelper();
         return;
     }
     completeFinish(false);
@@ -449,6 +460,15 @@ void ScrollCaptureController::createOverlayWindow()
     if (!m_screen || !m_engine)
         return;
 
+    // Mutter renders a native transparent fullscreen surface black. Like the
+    // recording border, keep only the UI in an XWayland child; the authorized
+    // ScreenCast/PipeWire stream stays in this Wayland process.
+    if (QGuiApplication::platformName().startsWith(QLatin1String("wayland"))
+        && m_app && !m_app->layerShellAvailable()) {
+        openOverlayHelper();
+        return;
+    }
+
     QQmlComponent component(m_engine, QUrl(QStringLiteral("qrc:/qt/qml/Unisic/qml/ScrollCaptureOverlay.qml")));
     if (component.isError()) {
         qWarning() << "ScrollCaptureOverlay component error:" << component.errorString();
@@ -494,9 +514,113 @@ void ScrollCaptureController::createOverlayWindow()
 
 void ScrollCaptureController::closeOverlayWindow()
 {
+    m_overlaySyncTimer.stop();
+    if (m_overlayHelper) {
+        QProcess *proc = m_overlayHelper;
+        m_overlayHelper = nullptr;
+        proc->closeWriteChannel(); // stdin EOF removes every helper window
+        QTimer::singleShot(1000, proc, [proc] {
+            if (proc->state() != QProcess::NotRunning)
+                proc->kill();
+        });
+    }
     if (m_window) {
         m_window->close();
         m_window->deleteLater();
         m_window = nullptr;
     }
+}
+
+void ScrollCaptureController::openOverlayHelper()
+{
+    auto *proc = new QProcess(this);
+    m_overlayHelper = proc;
+    m_helperOutput.clear();
+    m_helperPreviewRevision = -1;
+    proc->setProgram(QCoreApplication::applicationFilePath());
+    proc->setArguments({QStringLiteral("--scroll-overlay-helper")});
+    connect(proc, &QProcess::readyReadStandardError, this, [proc] {
+        DiagLog::appendChildOutput(QStringLiteral("scroll-overlay-helper"), proc->readAllStandardError());
+    });
+    connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc] {
+        m_helperOutput += proc->readAllStandardOutput();
+        int end;
+        while ((end = m_helperOutput.indexOf('\n')) >= 0) {
+            const QByteArray cmd = m_helperOutput.left(end).trimmed();
+            m_helperOutput.remove(0, end + 1);
+            if (m_overlayHelper != proc)
+                return;
+            if (cmd == "ready") {
+                syncOverlayHelper();
+                m_overlaySyncTimer.start();
+            } else if (cmd == "finish") {
+                finish();
+            } else if (cmd == "cancel") {
+                cancel();
+            }
+        }
+    });
+    connect(proc, &QProcess::errorOccurred, this, [this, proc](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart && m_overlayHelper == proc) {
+            qWarning() << "Scroll overlay helper failed to start:" << proc->errorString();
+            cancel();
+            proc->deleteLater();
+        }
+    });
+    connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [this, proc](int code, QProcess::ExitStatus) {
+        if (m_overlayHelper == proc) {
+            m_overlayHelper = nullptr;
+            m_overlaySyncTimer.stop();
+            qWarning() << "Scroll overlay helper exited during capture:" << code;
+            cancel();
+        }
+        proc->deleteLater();
+    });
+    proc->start();
+    qInfo() << "Scroll capture overlay: XWayland helper (capture remains on Wayland)";
+}
+
+void ScrollCaptureController::syncOverlayHelper()
+{
+    if (!m_overlayHelper || m_overlayHelper->state() != QProcess::Running || !m_screen || !m_engine)
+        return;
+    // A blocked helper must not accumulate thumbnails without a bound.
+    if (m_overlayHelper->bytesToWrite() > 256 * 1024)
+        return;
+    QObject *theme = m_engine->singletonInstance<QObject *>(QStringLiteral("Unisic"), QStringLiteral("Theme"));
+    if (!theme)
+        return;
+    const QRect screen = m_screen->geometry();
+    const qreal dpr = m_screen->devicePixelRatio();
+    const auto rectJson = [](const QRect &r) { return QJsonArray{r.x(), r.y(), r.width(), r.height()}; };
+    const auto text = [](const char *s) { return QCoreApplication::translate("ScrollCaptureOverlay", s); };
+    const QString label = m_lostTrack ? text("Scrolled too far at once - scroll back a little")
+                         : m_full ? text("Size limit reached - press Finish")
+                         : frameCount() <= 1 ? text("Scroll down to capture...")
+                         : text("%1 × %2 px (%3)").arg(stitchedWidth()).arg(stitchedHeight()).arg(frameCount());
+    QJsonObject state{
+        {QStringLiteral("name"), m_screen->name()},
+        {QStringLiteral("screen"), rectJson(screen)},
+        {QStringLiteral("physical"), QJsonArray{qRound(screen.width() * dpr), qRound(screen.height() * dpr)}},
+        {QStringLiteral("region"), rectJson(QRect(m_regionX, m_regionY, m_regionW, m_regionH))},
+        {QStringLiteral("coveredRows"), m_coveredRows},
+        {QStringLiteral("visible"), m_controlsShown && !m_finishing},
+        {QStringLiteral("frameCount"), frameCount()},
+        {QStringLiteral("label"), label},
+        {QStringLiteral("finish"), text("Finish")},
+        {QStringLiteral("cancel"), text("Cancel")}};
+    for (const auto &pair : {qMakePair("accent", "accent"), qMakePair("background", "primary"),
+                             qMakePair("foreground", "textPrimary")})
+        state.insert(QLatin1String(pair.first), theme->property(pair.second).value<QColor>().name(QColor::HexRgb));
+    if (frameCount() > 1 && m_helperPreviewRevision != m_previewRevision) {
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        if (previewThumbnail(120, 300).save(&buffer, "PNG")) {
+            state.insert(QStringLiteral("preview"), QString::fromLatin1(png.toBase64()));
+            m_helperPreviewRevision = m_previewRevision;
+        }
+    }
+    m_overlayHelper->write(QJsonDocument(state).toJson(QJsonDocument::Compact) + '\n');
 }

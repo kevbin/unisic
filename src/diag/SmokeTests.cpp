@@ -10,6 +10,7 @@
 
 #include "AppContext.h"
 #include "capture/ScrollStitcher.h"
+#include "capture/ScrollOverlayGeometry.h"
 #include "capture/KWinWindowGeometry.h"
 #include "unisic_build_date.h" // generated into the build dir (cmake/BuildDate.cmake)
 #include "Settings.h"
@@ -5958,6 +5959,15 @@ QString AppContext::scrollHandoffCheck()
 {
     if (m_captureInFlight || m_overlay->active() || scrollCaptureActive())
         return QStringLiteral("SKIP (a capture is in progress)");
+
+    // The GNOME child must target the selected AOC output, not whichever X
+    // monitor happens to be first. This check also runs from its Developer button.
+    using ScrollOverlayGeometry::Screen;
+    const QList<Screen> outputs{{QStringLiteral("XWAYLAND0"), QRect(3840, 0, 2160, 1440), {}},
+                                {QStringLiteral("XWAYLAND1"), QRect(0, 0, 3840, 2160), {}}};
+    if (ScrollOverlayGeometry::screenIndex(outputs,
+            {QStringLiteral("DP-1"), QRect(0, 0, 3840, 2160), QSize(3840, 2160)}) != 1)
+        return QStringLiteral("FAIL (GNOME overlay selected the other monitor)");
 
     const QRect rect(10, 20, 300, 400);
     int regionCalls = 0;

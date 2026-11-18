@@ -5,6 +5,7 @@
 #include "theme/IconImageProvider.h"
 #include "editor/WatermarkPreview.h"
 #include "capture/ScrollPreviewProvider.h"
+#include "capture/ScrollOverlayHelper.h"
 #include "update/StagedUpdate.h"
 #include "ConfigPath.h" // app-side UnisicConfig (same-dir include always wins)
 // The kit's own ConfigPath.h shares the basename, so it needs the explicit
@@ -693,6 +694,8 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         if (qstrcmp(argv[i], "--record-border-helper") == 0)
             return runRecordBorderHelper(argc, argv);
+        if (qstrcmp(argv[i], "--scroll-overlay-helper") == 0)
+            return runScrollOverlayHelper(argc, argv);
         // Styled capture card for GNOME/mutter — same xcb-before-QApplication
         // reason as the record border (one process can't host two QPA platforms).
         if (qstrcmp(argv[i], "--notification-helper") == 0)
