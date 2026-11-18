@@ -3,6 +3,7 @@
 
 #include <QApplication>
 #include <QColor>
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -120,7 +121,10 @@ public:
             bars[i]->setGeometry(sides[i]);
             bars[i]->setVisible(visible);
         }
+        const bool firstShow = visible && !badge.isVisible();
         badge.setVisible(visible);
+        if (firstShow)
+            qInfo() << "Scroll overlay controls shown at" << badge.geometry();
 
         if (state.contains(QStringLiteral("preview"))) {
             QPixmap image;

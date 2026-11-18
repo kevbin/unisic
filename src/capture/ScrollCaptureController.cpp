@@ -5,6 +5,7 @@
 #include "record/X11ShmGrabber.h"
 #include "capture/ScreenCastSession.h"
 #include "capture/KWinScreencasting.h"
+#include "ScrollOverlayTheme.h"
 #include "diag/DiagLog.h"
 
 #include <cmath>
@@ -588,9 +589,6 @@ void ScrollCaptureController::syncOverlayHelper()
     // A blocked helper must not accumulate thumbnails without a bound.
     if (m_overlayHelper->bytesToWrite() > 256 * 1024)
         return;
-    QObject *theme = m_engine->singletonInstance<QObject *>(QStringLiteral("Unisic"), QStringLiteral("Theme"));
-    if (!theme)
-        return;
     const QRect screen = m_screen->geometry();
     const qreal dpr = m_screen->devicePixelRatio();
     const auto rectJson = [](const QRect &r) { return QJsonArray{r.x(), r.y(), r.width(), r.height()}; };
@@ -610,9 +608,9 @@ void ScrollCaptureController::syncOverlayHelper()
         {QStringLiteral("label"), label},
         {QStringLiteral("finish"), text("Finish")},
         {QStringLiteral("cancel"), text("Cancel")}};
-    for (const auto &pair : {qMakePair("accent", "accent"), qMakePair("background", "primary"),
-                             qMakePair("foreground", "textPrimary")})
-        state.insert(QLatin1String(pair.first), theme->property(pair.second).value<QColor>().name(QColor::HexRgb));
+    const auto colors = ScrollOverlayTheme::colors(m_engine);
+    for (auto it = colors.begin(); it != colors.end(); ++it)
+        state.insert(it.key(), it.value());
     if (frameCount() > 1 && m_helperPreviewRevision != m_previewRevision) {
         QByteArray png;
         QBuffer buffer(&png);

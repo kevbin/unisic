@@ -651,6 +651,10 @@ if(BUILD_TESTING)
     target_link_libraries(unisic_scroll_overlay_geometry_test PRIVATE Qt6::Core Qt6::Test)
     target_include_directories(unisic_scroll_overlay_geometry_test PRIVATE src/capture)
     add_test(NAME unisic_scroll_overlay_geometry_test COMMAND unisic_scroll_overlay_geometry_test)
+    qt_add_executable(unisic_scroll_overlay_theme_test tests/ScrollOverlayThemeTest.cpp)
+    target_link_libraries(unisic_scroll_overlay_theme_test PRIVATE Qt6::Qml Qt6::Gui Qt6::Test)
+    target_include_directories(unisic_scroll_overlay_theme_test PRIVATE src/capture)
+    add_test(NAME unisic_scroll_overlay_theme_test COMMAND unisic_scroll_overlay_theme_test)
     # The UI child is Unix-only: QSocketNotifier watches its POSIX stdin pipe.
     # Windows has its native overlay and cannot watch a CRT pipe as a Winsock socket.
     if(NOT WIN32)
