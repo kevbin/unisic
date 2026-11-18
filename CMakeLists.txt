@@ -381,7 +381,7 @@ if(UNISIC_TRAY_ICONS)
     qt_add_resources(unisic "tray_icons" PREFIX "/" FILES ${UNISIC_TRAY_ICONS})
 endif()
 
-# Translations: the seven .ts files are compiled to .qm and embedded in the qrc
+# Translations: the eight .ts files are compiled to .qm and embedded in the qrc
 # under /i18n/, and `cmake --build build --target update_translations` refreshes
 # the source strings. Needs Qt6 LinguistTools (lupdate/lrelease).
 #
@@ -393,7 +393,7 @@ endif()
 find_package(Qt6 QUIET COMPONENTS LinguistTools)
 if(NOT Qt6LinguistTools_FOUND)
     unisic_require_failed("Qt6 LinguistTools (lupdate/lrelease)"
-        "every translation: the build would ship English only while the language picker still offers seven"
+        "every translation: the build would ship English only while the language picker still offers eight"
         "qt6-qttools-devel" "qt6-tools-dev qt6-l10n-tools" "qt6-tools" "qt6-linguist-devel")
 endif()
 set(UNISIC_TS_FILES
@@ -403,7 +403,8 @@ set(UNISIC_TS_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_it.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_fr.ts
     ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_ru.ts
-    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_de.ts)
+    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_de.ts
+    ${CMAKE_CURRENT_SOURCE_DIR}/i18n/unisic_zh_CN.ts)
 qt_add_lrelease(unisic TS_FILES ${UNISIC_TS_FILES}
                 QM_FILES_OUTPUT_VARIABLE UNISIC_QM_FILES)
 qt_add_resources(unisic "i18n" PREFIX "/i18n" BASE ${CMAKE_CURRENT_BINARY_DIR}
@@ -429,7 +430,7 @@ if(Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
 else()
     qt_add_lupdate(unisic TS_FILES ${UNISIC_TS_FILES} SOURCES ${UNISIC_LUPDATE_SOURCES})
 endif()
-message(STATUS "Translations: enabled (English, Polish, Spanish, Italian, French, Russian, German)")
+message(STATUS "Translations: enabled (English, Polish, Spanish, Italian, French, Russian, German, Simplified Chinese)")
 
 # The gate manifest CI asserts on. Every feature this build was supposed to
 # have, one NAME=ON line each, written where a packaging recipe can read it no
@@ -647,6 +648,15 @@ include(CPack)
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
+    qt_add_executable(unisic_ui_language_test tests/UiLanguageTest.cpp)
+    target_link_libraries(unisic_ui_language_test PRIVATE Qt6::Core Qt6::Test)
+    target_include_directories(unisic_ui_language_test PRIVATE src)
+    set(_unisic_zh_qm ${UNISIC_QM_FILES})
+    list(FILTER _unisic_zh_qm INCLUDE REGEX "unisic_zh_CN\\.qm$")
+    qt_add_resources(unisic_ui_language_test "zh_cn_catalog"
+        PREFIX "/i18n" BASE ${CMAKE_CURRENT_BINARY_DIR} FILES ${_unisic_zh_qm})
+    add_dependencies(unisic_ui_language_test unisic)
+    add_test(NAME unisic_ui_language_test COMMAND unisic_ui_language_test)
     qt_add_executable(unisic_scroll_overlay_geometry_test tests/ScrollOverlayGeometryTest.cpp)
     target_link_libraries(unisic_scroll_overlay_geometry_test PRIVATE Qt6::Core Qt6::Test)
     target_include_directories(unisic_scroll_overlay_geometry_test PRIVATE src/capture)

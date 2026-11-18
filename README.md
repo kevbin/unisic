@@ -44,6 +44,8 @@ To read the script before running it: `curl -fsSLO https://unisic.app/install.sh
 
 By hand: grab the **AppImage** or a native package from the **[latest release](https://github.com/unisic/unisic/releases/latest)**. Install downloaded packages with `sudo dnf install ./unisic-*.fedora.x86_64.rpm` or `sudo apt install ./unisic_*_amd64.deb` so dependencies get resolved. Windows 11 takes `unisic-<version>-windows-x64-experimental-setup.exe` or `Unisic-<version>-windows-x86_64-experimental.zip` from the same page (see Windows below). Repo snippets for Fedora COPR, Debian/Ubuntu, openSUSE, Arch and Nix: **[unisic.app → Download](https://unisic.app/#download)** or the [installation docs](https://unisic.app/docs/installation).
 
+UI languages: English, Polish, Spanish, Italian, French, Russian, German and Simplified Chinese. Choose one in Settings > General > Language; Chinese system locales select Simplified Chinese automatically.
+
 ## Press a hotkey, go
 
 | Keys | Description |
