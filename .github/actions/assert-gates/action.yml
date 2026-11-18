@@ -40,6 +40,28 @@ inputs:
 runs:
   using: composite
   steps:
+    # A manually requested Tests run can produce a stable-identity executable
+    # for a local hotfix without rebuilding the unchanged AppImage runtime.
+    # Regular PR/package runs retain their original build and packaging flow.
+    - name: Build hotfix executable for manual Tests runs
+      if: github.event_name == 'workflow_dispatch' && github.workflow == 'Tests'
+      shell: bash
+      env:
+        UNISIC_FIX_BUILD_DIR: ${{ inputs.build-dir }}
+      run: |
+        UNISIC_BUILD_NUMBER="$GITHUB_RUN_NUMBER" cmake -S . -B "$UNISIC_FIX_BUILD_DIR" \
+          -DUNISIC_DEV_BUILD=OFF
+        cmake --build "$UNISIC_FIX_BUILD_DIR" --target unisic --parallel
+
+    - name: Upload hotfix executable
+      if: github.event_name == 'workflow_dispatch' && github.workflow == 'Tests'
+      uses: actions/upload-artifact@v4
+      with:
+        name: unisic-gnomefix-executable
+        path: ${{ inputs.build-dir }}/unisic
+        if-no-files-found: error
+        retention-days: 14
+
     - name: Assert every build gate is on
       shell: bash
       # Passed through the environment rather than interpolated into the script
