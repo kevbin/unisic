@@ -6,10 +6,6 @@ on:
         description: Workflow run containing the unisic-appimage artifact
         required: true
         type: string
-      publish:
-        description: Publish this already-tested candidate after host-library verification
-        type: boolean
-        default: false
 permissions:
   contents: read
   actions: read
@@ -17,53 +13,19 @@ jobs:
   inspect:
     if: github.repository == 'kevbin/unisic'
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-      actions: read
     steps:
-      - name: Require successful source tests and packaging before recovery
-        id: candidate
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CANDIDATE_RUN: ${{ inputs.run_id }}
-        run: |
-          python3 - <<'PY'
-          import base64, json, os, re, subprocess
-          def api(path):
-              return json.loads(subprocess.check_output(['gh', 'api', path], text=True))
-          repo = os.environ['GITHUB_REPOSITORY']
-          run_id = os.environ['CANDIDATE_RUN']
-          assert run_id.isdigit()
-          run = api(f'repos/{repo}/actions/runs/{run_id}')
-          assert run['path'] == '.github/workflows/fork-updates.yml'
-          assert run['status'] == 'completed'
-          jobs = api(f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100')['jobs']
-          for name in ['prepare', 'tests / Build + unit tests', 'tests / Translations complete', 'bundle / AppImage']:
-              assert any(j['name'] == name and j['conclusion'] == 'success' for j in jobs), name
-          sha = run['head_sha']
-          source = api(f'repos/{repo}/contents/CMakeLists.txt?ref={sha}')
-          text = base64.b64decode(source['content']).decode()
-          base = re.search(r'^set\(UNISIC_VERSION_STRING "(\d+\.\d+\.\d+)"\)', text, re.M)[1]
-          version = f"{base}.{run['run_number']}"
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-              stream.write(f'source_sha={sha}\nversion={version}\nupstream_tag=v{base}\n')
-          PY
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.candidate.outputs.source_sha }}
-          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: unisic-appimage
           path: dist
           run-id: ${{ inputs.run_id }}
           github-token: ${{ github.token }}
-      - name: Provide the platform libraries supplied by a PipeWire desktop
+      - name: Provide the platform libraries supplied by a desktop
         run: |
           sudo apt-get install -y --no-install-recommends \
             libpipewire-0.3-0t64 libwayland-client0 libwayland-cursor0 libwayland-egl1 \
             libopengl0 libgl1 libegl1 libxkbcommon0
-      - name: Run the self-contained bundle and report loader errors
+      - name: Run the bundle and report loader errors
         run: |
           for image in dist/*.AppImage; do
             chmod +x "$image"
@@ -71,28 +33,3 @@ jobs:
             ldd squashfs-root/usr/bin/unisic
             "$image" --appimage-extract-and-run --version
           done
-      - name: Publish the validated candidate without rebuilding it
-        if: inputs.publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FORK_VERSION: ${{ steps.candidate.outputs.version }}
-          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
-          UPSTREAM_TAG: ${{ steps.candidate.outputs.upstream_tag }}
-          CANDIDATE_RUN: ${{ inputs.run_id }}
-        run: |
-          # This recovery is for runs whose prepared source equals the run's
-          # head. Refuse a merge-generated candidate rather than mislabel it.
-          python3 - <<'PY'
-          import json, os, subprocess
-          def api(path):
-              return json.loads(subprocess.check_output(['gh', 'api', path], text=True))
-          repo = os.environ['GITHUB_REPOSITORY']
-          sha = os.environ['SOURCE_SHA']
-          tag = os.environ['UPSTREAM_TAG']
-          upstream = api(f'repos/unisic/unisic/commits/{tag}')['sha']
-          subprocess.run(['git', 'fetch', '--no-tags', 'https://github.com/unisic/unisic.git', f'refs/tags/{tag}'], check=True)
-          subprocess.run(['git', 'merge-base', '--is-ancestor', upstream, sha], check=True)
-          os.environ['UPSTREAM_SHA'] = upstream
-          # Source tests and exact-version runtime checks above are mandatory.
-          subprocess.run(['python3', 'scripts/publish_fork_release.py'], check=True)
-          PY
